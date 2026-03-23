@@ -1,9 +1,11 @@
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { useTheme } from '../hooks/useTheme';
 import { Icons } from '../components/Icons';
 import { useState } from 'react';
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const { settings, updateSettings } = useAppStore();
   const { theme, setTheme } = useTheme();
   const [customCSS, setCustomCSS] = useState('');
@@ -16,6 +18,15 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <header className="settings-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+          <button
+            onClick={() => navigate('/')}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+          >
+            <Icons.Home style={{ width: '18px', height: '18px' }} />
+          </button>
+        </div>
         <h1 className="settings-title">Settings</h1>
         <p className="settings-description">
           Customize your notes app experience
