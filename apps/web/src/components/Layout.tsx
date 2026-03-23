@@ -91,6 +91,7 @@ export function Layout() {
         currentNoteId={location.pathname.includes('/note/') ? location.pathname.split('/note/')[1] : null}
         onSelectNote={(id) => navigate(`/note/${id}`)}
         notes={notes}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
       <main className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -162,47 +163,48 @@ interface SidebarProps {
   currentNoteId: string | null;
   onSelectNote: (id: string) => void;
   notes: { id: string; title: string; updatedAt: Date }[];
+  onToggleCollapse: () => void;
 }
 
-function Sidebar({ collapsed, fileTree, onToggleFolder, onCreateNote, currentNoteId, onSelectNote, notes }: SidebarProps) {
-  if (collapsed) {
-    return (
-      <aside className="sidebar collapsed">
-        <div className="sidebar-footer">
-          <button className="btn btn-ghost btn-icon" onClick={onCreateNote} title="New Note">
-            <Icons.Plus />
-          </button>
-        </div>
-      </aside>
-    );
-  }
-
+function Sidebar({ collapsed, fileTree, onToggleFolder, onCreateNote, currentNoteId, onSelectNote, notes, onToggleCollapse }: SidebarProps) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <span className="sidebar-title">Explorer</span>
-        <button className="btn btn-ghost btn-icon btn-sm" onClick={onCreateNote} title="New Note">
-          <Icons.Plus />
-        </button>
-      </div>
+    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+      {!collapsed && (
+        <>
+          <div className="sidebar-header">
+            <span className="sidebar-title">Explorer</span>
+            <button className="btn btn-ghost btn-icon btn-sm" onClick={onCreateNote} title="New Note">
+              <Icons.Plus />
+            </button>
+          </div>
 
-      <div className="sidebar-content">
-        <FileExplorer
-          items={fileTree}
-          notes={notes}
-          onToggleFolder={onToggleFolder}
-          currentNoteId={currentNoteId}
-          onSelectNote={onSelectNote}
-        />
-      </div>
+          <div className="sidebar-content">
+            <FileExplorer
+              items={fileTree}
+              notes={notes}
+              onToggleFolder={onToggleFolder}
+              currentNoteId={currentNoteId}
+              onSelectNote={onSelectNote}
+            />
+          </div>
 
-      <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-            {notes.length} notes
-          </span>
-        </div>
-      </div>
+          <div className="sidebar-footer">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                {notes.length} notes
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+      
+      <button 
+        className="sidebar-toggle"
+        onClick={onToggleCollapse}
+        title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+      >
+        <Icons.ChevronRight style={{ width: '14px', height: '14px', transform: collapsed ? 'rotate(0deg)' : 'rotate(180deg)' }} />
+      </button>
     </aside>
   );
 }
