@@ -1,4 +1,5 @@
 import { useAppStore } from '../store/appStore';
+import { useNotesStore } from '../store/notesStore';
 import { useTheme } from '@notes-app/ui';
 import { Icons } from '@notes-app/ui';
 import { useState } from 'react';
@@ -6,11 +7,16 @@ import { useState } from 'react';
 export function SettingsPage() {
   const { settings, updateSettings } = useAppStore();
   const { theme, setTheme } = useTheme();
+  const { vaultPath, vaultInitialized, selectVault } = useNotesStore();
   const [customCSS, setCustomCSS] = useState('');
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
     updateSettings({ theme: newTheme });
+  };
+
+  const handleSelectVault = async () => {
+    await selectVault();
   };
 
   return (
@@ -21,6 +27,25 @@ export function SettingsPage() {
           Customize your notes app experience
         </p>
       </header>
+
+      <section className="settings-section">
+        <h2 className="settings-section-title">Vault</h2>
+
+        <div className="settings-item">
+          <div className="settings-item-content">
+            <div className="settings-item-label">Vault Folder</div>
+            <div className="settings-item-description">
+              {vaultPath ? vaultPath : 'No vault selected'}
+            </div>
+          </div>
+          <div className="settings-item-control">
+            <button className="btn btn-secondary" onClick={handleSelectVault}>
+              <Icons.FolderOpen />
+              {vaultInitialized ? 'Change Vault' : 'Select Vault'}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section className="settings-section">
         <h2 className="settings-section-title">Appearance</h2>

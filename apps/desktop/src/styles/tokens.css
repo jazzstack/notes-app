@@ -88,6 +88,7 @@
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
+  --color-error-subtle: #fef2f2;
 
   --color-scrollbar: #cbd5e1;
   --color-scrollbar-hover: #94a3b8;
@@ -120,6 +121,7 @@
   --color-success: #4ade80;
   --color-warning: #fbbf24;
   --color-error: #f87171;
+  --color-error-subtle: #450a0a;
 
   --color-scrollbar: #404040;
   --color-scrollbar-hover: #525252;

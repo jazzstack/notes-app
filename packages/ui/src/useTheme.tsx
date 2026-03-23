@@ -31,24 +31,24 @@ function storeTheme(theme: Theme): void {
   localStorage.setItem(STORAGE_KEY, theme);
 }
 
+function resolveTheme(theme: Theme): 'light' | 'dark' {
+  return theme === 'system' ? getSystemTheme() : theme;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getStoredTheme);
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => {
-    const stored = getStoredTheme();
-    return stored === 'system' ? getSystemTheme() : stored;
-  });
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolveTheme(getStoredTheme()));
 
-  const applyTheme = useCallback((newTheme: Theme) => {
-    const resolved = newTheme === 'system' ? getSystemTheme() : newTheme;
+  useEffect(() => {
+    const resolved = resolveTheme(theme);
     setResolvedTheme(resolved);
     document.documentElement.setAttribute('data-theme', resolved);
-  }, []);
+  }, [theme]);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
     storeTheme(newTheme);
-    applyTheme(newTheme);
-  }, [applyTheme]);
+  }, []);
 
   const toggleTheme = useCallback(() => {
     const newTheme = resolvedTheme === 'light' ? 'dark' : 'light';
@@ -56,18 +56,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [resolvedTheme, setTheme]);
 
   useEffect(() => {
-    applyTheme(theme);
+    if (theme !== 'system') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      if (theme === 'system') {
-        applyTheme('system');
-      }
+      setResolvedTheme(getSystemTheme());
     };
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme, applyTheme]);
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>

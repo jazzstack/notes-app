@@ -2,8 +2,9 @@
   "name": "notes-app",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "workspaces": [
-    "apps/*",
+    "apps/desktop",
     "packages/*"
   ],
   "scripts": {
@@ -14,8 +15,14 @@
     "clean": "turbo run clean"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.1.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
     "turbo": "^2.3.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.57.1"
   },
   "engines": {
     "node": ">=18",

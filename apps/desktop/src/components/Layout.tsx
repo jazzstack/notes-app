@@ -1,34 +1,76 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { useNotesStore } from '../store/notesStore';
+import { useNotesStore, FileEntry } from '../store/notesStore';
 import { useTheme } from '@notes-app/ui';
 import { CommandPalette, Icons } from '@notes-app/ui';
 
-interface FileTreeItem {
-  id: string;
-  name: string;
-  type: 'file' | 'folder';
-  children?: FileTreeItem[];
-  isOpen?: boolean;
+interface FolderState {
+  [key: string]: boolean;
 }
 
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const notes = useNotesStore((state) => state.notes);
+  const vaultInitialized = useNotesStore((state) => state.vaultInitialized);
+  const fileTree = useNotesStore((state) => state.fileTree);
   const createNote = useNotesStore((state) => state.createNote);
+  const loadDirectory = useNotesStore((state) => state.loadDirectory);
+  const vaultPath = useNotesStore((state) => state.vaultPath);
+  const selectVault = useNotesStore((state) => state.selectVault);
   const { resolvedTheme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showRightPanel, setShowRightPanel] = useState(true);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [fileTree] = useState<FileTreeItem[]>([
-    { id: 'notes', name: 'Notes', type: 'folder', isOpen: true },
-  ]);
+  const [expandedFolders, setExpandedFolders] = useState<FolderState>({});
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: FileEntry } | null>(null);
+
+  useEffect(() => {
+    if (vaultInitialized && vaultPath) {
+      loadDirectory(vaultPath);
+    }
+  }, [vaultInitialized, vaultPath, loadDirectory]);
 
   const handleCreateNote = useCallback(async () => {
     const note = await createNote('Untitled');
-    navigate(`/note/${note.id}`);
+    if (note) {
+      navigate(`/note/${note.id}`);
+    }
   }, [createNote, navigate]);
+
+  const handleCreateFolder = useCallback(async () => {
+    const name = prompt('Enter folder name:');
+    if (name) {
+      try {
+        const { createFolder } = useNotesStore.getState();
+        await createFolder(name);
+      } catch (e) {
+        console.error('Failed to create folder:', e);
+      }
+    }
+  }, []);
+
+  const toggleFolder = useCallback((path: string) => {
+    setExpandedFolders((prev) => {
+      const newState = { ...prev };
+      newState[path] = !newState[path];
+      return newState;
+    });
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, item: FileEntry) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  useEffect(() => {
+    const handleClick = () => closeContextMenu();
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [closeContextMenu]);
 
   const commandItems = [
     {
@@ -38,6 +80,22 @@ export function Layout() {
       shortcut: ['⌘', 'N'],
       category: 'Notes',
       action: handleCreateNote,
+    },
+    {
+      id: 'new-folder',
+      title: 'New Folder',
+      description: 'Create a new folder',
+      shortcut: ['⌘', 'Shift', 'N'],
+      category: 'Notes',
+      action: handleCreateFolder,
+    },
+    {
+      id: 'open-vault',
+      title: 'Open Vault',
+      description: 'Select a vault folder',
+      shortcut: ['⌘', 'O'],
+      category: 'Vault',
+      action: selectVault,
     },
     {
       id: 'toggle-theme',
@@ -54,13 +112,6 @@ export function Layout() {
       action: () => setSidebarCollapsed(!sidebarCollapsed),
     },
     {
-      id: 'toggle-right-panel',
-      title: showRightPanel ? 'Hide Right Panel' : 'Show Right Panel',
-      shortcut: ['⌘', ';'],
-      category: 'View',
-      action: () => setShowRightPanel(!showRightPanel),
-    },
-    {
       id: 'settings',
       title: 'Open Settings',
       shortcut: ['⌘', ','],
@@ -68,10 +119,6 @@ export function Layout() {
       action: () => navigate('/settings'),
     },
   ];
-
-  const toggleFolder = useCallback((_id: string) => {
-    // Folder toggle logic
-  }, []);
 
   return (
     <div className="app-layout">
@@ -85,22 +132,57 @@ export function Layout() {
       <Sidebar
         collapsed={sidebarCollapsed}
         fileTree={fileTree}
+        notes={notes}
+        expandedFolders={expandedFolders}
         onToggleFolder={toggleFolder}
         onCreateNote={handleCreateNote}
+        onCreateFolder={handleCreateFolder}
+        onContextMenu={handleContextMenu}
         currentNoteId={location.pathname.includes('/note/') ? location.pathname.split('/note/')[1] : null}
         onSelectNote={(id) => navigate(`/note/${id}`)}
-        notes={notes}
+        onSelectVault={selectVault}
+        vaultInitialized={vaultInitialized}
       />
 
       <main className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <Outlet />
       </main>
 
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onRename={async () => {
+            const newName = prompt('Enter new name:', contextMenu.item.name);
+            if (newName && newName !== contextMenu.item.name) {
+              if (contextMenu.item.is_dir) {
+                await useNotesStore.getState().renameFolder(contextMenu.item.path, newName);
+              } else {
+                const title = newName.replace(/\.(md|markdown)$/, '');
+                await useNotesStore.getState().renameNote(contextMenu.item.path, title);
+              }
+            }
+            closeContextMenu();
+          }}
+          onDelete={async () => {
+            const confirmed = confirm(`Are you sure you want to delete "${contextMenu.item.name}"?`);
+            if (confirmed) {
+              if (contextMenu.item.is_dir) {
+                await useNotesStore.getState().deleteFolder(contextMenu.item.path);
+              } else {
+                await useNotesStore.getState().deleteNote(contextMenu.item.path);
+              }
+            }
+            closeContextMenu();
+          }}
+        />
+      )}
+
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         items={commandItems}
-        placeholder="Search commands..."
+        placeholder="Search or run command..."
       />
     </div>
   );
@@ -155,21 +237,44 @@ function TopBar({ onOpenCommandPalette, onToggleTheme, resolvedTheme, onNavigate
 
 interface SidebarProps {
   collapsed: boolean;
-  fileTree: FileTreeItem[];
-  onToggleFolder: (id: string) => void;
+  fileTree: FileEntry[];
+  notes: { id: string; title: string; updatedAt: Date | string; path: string }[];
+  expandedFolders: FolderState;
+  onToggleFolder: (path: string) => void;
   onCreateNote: () => void;
+  onCreateFolder: () => void;
+  onContextMenu: (e: React.MouseEvent, item: FileEntry) => void;
   currentNoteId: string | null;
   onSelectNote: (id: string) => void;
-  notes: { id: string; title: string; updatedAt: Date }[];
+  onSelectVault: () => void;
+  vaultInitialized: boolean;
 }
 
-function Sidebar({ collapsed, fileTree, onToggleFolder, onCreateNote, currentNoteId, onSelectNote, notes }: SidebarProps) {
+function Sidebar({
+  collapsed,
+  fileTree,
+  notes,
+  expandedFolders,
+  onToggleFolder,
+  onCreateNote,
+  onCreateFolder,
+  onContextMenu,
+  currentNoteId,
+  onSelectNote,
+  onSelectVault,
+  vaultInitialized
+}: SidebarProps) {
+  const noteByPath = new Map(notes.map((n) => [n.path, n]));
+
   if (collapsed) {
     return (
       <aside className="sidebar collapsed">
         <div className="sidebar-footer">
           <button className="btn btn-ghost btn-icon" onClick={onCreateNote} title="New Note">
             <Icons.Plus />
+          </button>
+          <button className="btn btn-ghost btn-icon" onClick={onSelectVault} title="Open Vault">
+            <Icons.FolderOpen />
           </button>
         </div>
       </aside>
@@ -180,23 +285,43 @@ function Sidebar({ collapsed, fileTree, onToggleFolder, onCreateNote, currentNot
     <aside className="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-title">Explorer</span>
-        <button className="btn btn-ghost btn-icon btn-sm" onClick={onCreateNote} title="New Note">
-          <Icons.Plus />
-        </button>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button className="btn btn-ghost btn-icon btn-sm" onClick={onCreateNote} title="New Note">
+            <Icons.Plus />
+          </button>
+          <button className="btn btn-ghost btn-icon btn-sm" onClick={onCreateFolder} title="New Folder">
+            <Icons.Folder />
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-content">
-        <FileExplorer
-          items={fileTree}
-          notes={notes}
-          onToggleFolder={onToggleFolder}
-          currentNoteId={currentNoteId}
-          onSelectNote={onSelectNote}
-        />
+        {!vaultInitialized ? (
+          <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
+              No vault selected
+            </p>
+            <button className="btn btn-primary btn-sm" onClick={onSelectVault}>
+              <Icons.FolderOpen />
+              Open Vault
+            </button>
+          </div>
+        ) : (
+          <FileExplorer
+            items={fileTree}
+            noteByPath={noteByPath}
+            expandedFolders={expandedFolders}
+            onToggleFolder={onToggleFolder}
+            onContextMenu={onContextMenu}
+            currentNoteId={currentNoteId}
+            onSelectNote={onSelectNote}
+          />
+        )}
       </div>
 
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+          <Icons.Folder style={{ width: '12px', height: '12px', color: 'var(--color-text-tertiary)' }} />
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
             {notes.length} notes
           </span>
@@ -207,44 +332,212 @@ function Sidebar({ collapsed, fileTree, onToggleFolder, onCreateNote, currentNot
 }
 
 interface FileExplorerProps {
-  items: FileTreeItem[];
-  notes: { id: string; title: string; updatedAt: Date }[];
-  onToggleFolder: (id: string) => void;
+  items: FileEntry[];
+  noteByPath: Map<string, { id: string; title: string; updatedAt: Date | string; path: string }>;
+  expandedFolders: FolderState;
+  onToggleFolder: (path: string) => void;
+  onContextMenu: (e: React.MouseEvent, item: FileEntry) => void;
   currentNoteId: string | null;
   onSelectNote: (id: string) => void;
 }
 
-function FileExplorer({ items, notes, onToggleFolder, currentNoteId, onSelectNote }: FileExplorerProps) {
+function FileExplorer({
+  items,
+  noteByPath,
+  expandedFolders,
+  onToggleFolder,
+  onContextMenu,
+  currentNoteId,
+  onSelectNote
+}: FileExplorerProps) {
+  const folders = items.filter((item) => item.is_dir);
+  const files = items.filter((item) => item.is_note);
+
   return (
     <div className="file-explorer">
-      {items.map(item => (
-        <div key={item.id} className="folder">
-          <div className="folder-header" onClick={() => onToggleFolder(item.id)}>
-            <Icons.ChevronRight className="folder-icon" style={{ transform: item.isOpen ? 'rotate(90deg)' : undefined }} />
+      {folders.map((folder) => (
+        <div key={folder.path} className="folder">
+          <div
+            className="folder-header"
+            onClick={() => onToggleFolder(folder.path)}
+            onContextMenu={(e) => onContextMenu(e, folder)}
+          >
+            <Icons.ChevronRight
+              className="folder-icon"
+              style={{ transform: expandedFolders[folder.path] ? 'rotate(90deg)' : undefined }}
+            />
             <Icons.Folder className="file-item-icon" />
-            <span className="file-item-name">{item.name}</span>
+            <span className="file-item-name">{folder.name}</span>
           </div>
-          {item.isOpen && (
-            <div className="folder-children">
-              {notes.map(note => (
-                <div
-                  key={note.id}
-                  className={`file-item ${currentNoteId === note.id ? 'active' : ''}`}
-                  onClick={() => onSelectNote(note.id)}
-                >
-                  <Icons.FileText className="file-item-icon" />
-                  <span className="file-item-name">{note.title || 'Untitled'}</span>
-                </div>
-              ))}
-              {notes.length === 0 && (
-                <div className="file-item" style={{ color: 'var(--color-text-tertiary)', cursor: 'default' }}>
-                  <span style={{ marginLeft: '24px', fontSize: 'var(--text-xs)' }}>No notes yet</span>
-                </div>
-              )}
-            </div>
+          {expandedFolders[folder.path] && (
+            <FolderContents
+              path={folder.path}
+              noteByPath={noteByPath}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
+              onContextMenu={onContextMenu}
+              currentNoteId={currentNoteId}
+              onSelectNote={onSelectNote}
+            />
           )}
         </div>
       ))}
+
+      {files.map((file) => {
+        const note = noteByPath.get(file.path);
+        const isActive = note && currentNoteId === note.id;
+
+        return (
+          <div
+            key={file.path}
+            className={`file-item ${isActive ? 'active' : ''}`}
+            onClick={() => note && onSelectNote(note.id)}
+            onContextMenu={(e) => onContextMenu(e, file)}
+          >
+            <Icons.FileText className="file-item-icon" />
+            <span className="file-item-name">{note?.title || file.name.replace(/\.(md|markdown)$/, '')}</span>
+          </div>
+        );
+      })}
+
+      {folders.length === 0 && files.length === 0 && (
+        <div className="file-item" style={{ color: 'var(--color-text-tertiary)', cursor: 'default' }}>
+          <span style={{ marginLeft: '24px', fontSize: 'var(--text-xs)' }}>No notes yet</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface FolderContentsProps {
+  path: string;
+  noteByPath: Map<string, { id: string; title: string; updatedAt: Date | string; path: string }>;
+  expandedFolders: FolderState;
+  onToggleFolder: (path: string) => void;
+  onContextMenu: (e: React.MouseEvent, item: FileEntry) => void;
+  currentNoteId: string | null;
+  onSelectNote: (id: string) => void;
+}
+
+function FolderContents({
+  path,
+  noteByPath,
+  expandedFolders,
+  onToggleFolder,
+  onContextMenu,
+  currentNoteId,
+  onSelectNote
+}: FolderContentsProps) {
+  const [contents, setContents] = useState<FileEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadContents = async () => {
+      try {
+        const entries = await useNotesStore.getState().loadDirectory(path);
+        setContents(entries);
+      } catch (e) {
+        console.error('Failed to load folder contents:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadContents();
+  }, [path]);
+
+  if (loading) {
+    return (
+      <div className="folder-children" style={{ paddingLeft: 'var(--space-6)' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>Loading...</span>
+      </div>
+    );
+  }
+
+  const folders = contents.filter((item) => item.is_dir);
+  const files = contents.filter((item) => item.is_note);
+
+  return (
+    <div className="folder-children">
+      {folders.map((folder) => (
+        <div key={folder.path} className="folder">
+          <div
+            className="folder-header"
+            onClick={() => onToggleFolder(folder.path)}
+            onContextMenu={(e) => onContextMenu(e, folder)}
+          >
+            <Icons.ChevronRight
+              className="folder-icon"
+              style={{ transform: expandedFolders[folder.path] ? 'rotate(90deg)' : undefined }}
+            />
+            <Icons.Folder className="file-item-icon" />
+            <span className="file-item-name">{folder.name}</span>
+          </div>
+          {expandedFolders[folder.path] && (
+            <FolderContents
+              path={folder.path}
+              noteByPath={noteByPath}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
+              onContextMenu={onContextMenu}
+              currentNoteId={currentNoteId}
+              onSelectNote={onSelectNote}
+            />
+          )}
+        </div>
+      ))}
+
+      {files.map((file) => {
+        const note = noteByPath.get(file.path);
+        const isActive = note && currentNoteId === note.id;
+
+        return (
+          <div
+            key={file.path}
+            className={`file-item ${isActive ? 'active' : ''}`}
+            onClick={() => note && onSelectNote(note.id)}
+            onContextMenu={(e) => onContextMenu(e, file)}
+          >
+            <Icons.FileText className="file-item-icon" />
+            <span className="file-item-name">{note?.title || file.name.replace(/\.(md|markdown)$/, '')}</span>
+          </div>
+        );
+      })}
+
+      {folders.length === 0 && files.length === 0 && (
+        <div className="file-item" style={{ color: 'var(--color-text-tertiary)', cursor: 'default' }}>
+          <span style={{ marginLeft: '24px', fontSize: 'var(--text-xs)' }}>Empty folder</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ContextMenuProps {
+  x: number;
+  y: number;
+  onRename: () => void;
+  onDelete: () => void;
+}
+
+function ContextMenu({ x, y, onRename, onDelete }: ContextMenuProps) {
+  return (
+    <div
+      className="context-menu"
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        zIndex: 1000,
+      }}
+    >
+      <div className="context-menu-item" onClick={onRename}>
+        <Icons.FileText style={{ width: '14px', height: '14px' }} />
+        Rename
+      </div>
+      <div className="context-menu-item context-menu-item-danger" onClick={onDelete}>
+        <Icons.Trash style={{ width: '14px', height: '14px' }} />
+        Delete
+      </div>
     </div>
   );
 }

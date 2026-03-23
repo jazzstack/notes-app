@@ -14,12 +14,6 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@notes-app/core": ["packages/core/src"],
-      "@notes-app/core/*": ["packages/core/src/*"],
-      "@notes-app/plugins": ["packages/plugins/src"],
-      "@notes-app/plugins/*": ["packages/plugins/src/*"],
-      "@notes-app/sync": ["packages/sync/src"],
-      "@notes-app/sync/*": ["packages/sync/src/*"],
       "@notes-app/shared": ["packages/shared/src"],
       "@notes-app/shared/*": ["packages/shared/src/*"],
       "@notes-app/ui": ["packages/ui/src"],
@@ -27,5 +21,5 @@
     },
     "types": ["node"]
   },
-  "exclude": ["node_modules", "dist", ".turbo", "**/vite.config.ts", "**/*.config.ts", "apps"]
+  "exclude": ["node_modules", "dist", ".turbo", "**/vite.config.ts", "**/*.config.ts"]
 }

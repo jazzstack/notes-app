@@ -46,11 +46,11 @@ export function NotePage() {
   }, [title, content]);
 
   const handleDelete = useCallback(() => {
-    if (id && confirm('Are you sure you want to delete this note?')) {
-      deleteNote(id);
+    if (note && confirm('Are you sure you want to delete this note?')) {
+      deleteNote(note.path);
       navigate('/');
     }
-  }, [id, deleteNote, navigate]);
+  }, [note, deleteNote, navigate]);
 
   if (!note) {
     return (
