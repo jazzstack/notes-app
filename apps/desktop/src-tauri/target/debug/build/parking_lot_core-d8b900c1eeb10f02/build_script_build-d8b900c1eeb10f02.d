@@ -1,5 +1,5 @@
-/home/shubho/dev/notes-app/apps/desktop/src-tauri/target/debug/build/parking_lot_core-d8b900c1eeb10f02/build_script_build-d8b900c1eeb10f02.d: /home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/build.rs
+/home/venus/notes-app/apps/desktop/src-tauri/target/debug/build/parking_lot_core-d8b900c1eeb10f02/build_script_build-d8b900c1eeb10f02.d: /home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/build.rs
 
-/home/shubho/dev/notes-app/apps/desktop/src-tauri/target/debug/build/parking_lot_core-d8b900c1eeb10f02/build_script_build-d8b900c1eeb10f02: /home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/build.rs
+/home/venus/notes-app/apps/desktop/src-tauri/target/debug/build/parking_lot_core-d8b900c1eeb10f02/build_script_build-d8b900c1eeb10f02: /home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/build.rs
 
-/home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/build.rs:
+/home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/build.rs:

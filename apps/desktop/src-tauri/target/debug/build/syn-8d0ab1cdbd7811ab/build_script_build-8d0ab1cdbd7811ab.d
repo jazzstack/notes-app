@@ -1,5 +1,5 @@
-/home/shubho/dev/notes-app/apps/desktop/src-tauri/target/debug/build/syn-8d0ab1cdbd7811ab/build_script_build-8d0ab1cdbd7811ab.d: /home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-1.0.109/build.rs
+/home/venus/notes-app/apps/desktop/src-tauri/target/debug/build/syn-8d0ab1cdbd7811ab/build_script_build-8d0ab1cdbd7811ab.d: /home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-1.0.109/build.rs
 
-/home/shubho/dev/notes-app/apps/desktop/src-tauri/target/debug/build/syn-8d0ab1cdbd7811ab/build_script_build-8d0ab1cdbd7811ab: /home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-1.0.109/build.rs
+/home/venus/notes-app/apps/desktop/src-tauri/target/debug/build/syn-8d0ab1cdbd7811ab/build_script_build-8d0ab1cdbd7811ab: /home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-1.0.109/build.rs
 
-/home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-1.0.109/build.rs:
+/home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-1.0.109/build.rs:

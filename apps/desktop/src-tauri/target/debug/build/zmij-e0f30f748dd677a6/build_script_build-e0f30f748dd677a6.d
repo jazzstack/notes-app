@@ -1,5 +1,5 @@
-/home/shubho/dev/notes-app/apps/desktop/src-tauri/target/debug/build/zmij-e0f30f748dd677a6/build_script_build-e0f30f748dd677a6.d: /home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/build.rs
+/home/venus/notes-app/apps/desktop/src-tauri/target/debug/build/zmij-e0f30f748dd677a6/build_script_build-e0f30f748dd677a6.d: /home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/build.rs
 
-/home/shubho/dev/notes-app/apps/desktop/src-tauri/target/debug/build/zmij-e0f30f748dd677a6/build_script_build-e0f30f748dd677a6: /home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/build.rs
+/home/venus/notes-app/apps/desktop/src-tauri/target/debug/build/zmij-e0f30f748dd677a6/build_script_build-e0f30f748dd677a6: /home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/build.rs
 
-/home/shubho/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/build.rs:
+/home/venus/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/build.rs:

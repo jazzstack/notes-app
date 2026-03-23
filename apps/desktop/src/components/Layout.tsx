@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useNotesStore, FileEntry } from '../store/notesStore';
 import { useTheme } from '@notes-app/ui';
 import { CommandPalette, Icons } from '@notes-app/ui';
+import { SidebarCalendar } from './SidebarCalendar';
 
 interface FolderState {
   [key: string]: boolean;
@@ -20,15 +21,56 @@ export function Layout() {
   const selectVault = useNotesStore((state) => state.selectVault);
   const { resolvedTheme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [history, setHistory] = useState<string[]>(['/']);
+  const [sidebarWidth, setSidebarWidth] = useState(260);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<FolderState>({});
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: FileEntry } | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
 
   useEffect(() => {
     if (vaultInitialized && vaultPath) {
       loadDirectory(vaultPath);
     }
   }, [vaultInitialized, vaultPath, loadDirectory]);
+
+  useEffect(() => {
+    setHistory((prev) => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      if (newHistory[newHistory.length - 1] !== location.pathname) {
+        newHistory.push(location.pathname);
+        return newHistory;
+      }
+      return prev;
+    });
+    setHistoryIndex((prev) => Math.min(prev + 1, history.length));
+  }, [location.pathname]);
+
+  const handleGoBack = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      navigate(history[newIndex]);
+    }
+  }, [historyIndex, history, navigate]);
+
+  const handleGoForward = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      navigate(history[newIndex]);
+    }
+  }, [historyIndex, history, navigate]);
+
+  const handleGoHome = useCallback(() => {
+    navigate('/');
+    const newHistory = [...history.slice(0, historyIndex + 1), '/'];
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  }, [navigate, history, historyIndex]);
 
   const handleCreateNote = useCallback(async () => {
     const note = await createNote('Untitled');
@@ -71,6 +113,41 @@ export function Layout() {
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [closeContextMenu]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (sidebarCollapsed) return;
+    e.preventDefault();
+    setIsResizing(true);
+    startXRef.current = e.clientX;
+    startWidthRef.current = sidebarWidth;
+  }, [sidebarCollapsed, sidebarWidth]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const delta = e.clientX - startXRef.current;
+      const newWidth = Math.max(180, Math.min(500, startWidthRef.current + delta));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
 
   const commandItems = [
     {
@@ -127,10 +204,19 @@ export function Layout() {
         onToggleTheme={toggleTheme}
         resolvedTheme={resolvedTheme}
         onNavigateSettings={() => navigate('/settings')}
+        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+        sidebarCollapsed={sidebarCollapsed}
+        canGoBack={historyIndex > 0}
+        canGoForward={historyIndex < history.length - 1}
+        onGoBack={handleGoBack}
+        onGoForward={handleGoForward}
+        onGoHome={handleGoHome}
       />
 
       <Sidebar
         collapsed={sidebarCollapsed}
+        width={sidebarWidth}
+        onResizeStart={handleMouseDown}
         fileTree={fileTree}
         notes={notes}
         expandedFolders={expandedFolders}
@@ -144,7 +230,10 @@ export function Layout() {
         vaultInitialized={vaultInitialized}
       />
 
-      <main className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <main 
+        className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        style={{ marginLeft: sidebarCollapsed ? 0 : sidebarWidth }}
+      >
         <Outlet />
       </main>
 
@@ -195,11 +284,57 @@ interface TopBarProps {
   onNavigateSettings: () => void;
 }
 
-function TopBar({ onOpenCommandPalette, onToggleTheme, resolvedTheme, onNavigateSettings }: TopBarProps) {
+interface TopBarProps {
+  onOpenCommandPalette: () => void;
+  onToggleTheme: () => void;
+  resolvedTheme: 'light' | 'dark';
+  onNavigateSettings: () => void;
+  onToggleSidebar: () => void;
+  sidebarCollapsed: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  onGoBack: () => void;
+  onGoForward: () => void;
+  onGoHome: () => void;
+}
+
+function TopBar({ onOpenCommandPalette, onToggleTheme, resolvedTheme, onNavigateSettings, onToggleSidebar, sidebarCollapsed, canGoBack, canGoForward, onGoBack, onGoForward, onGoHome }: TopBarProps) {
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <span className="topbar-title">Notes</span>
+        <button
+          className="sidebar-toggle-btn"
+          onClick={onToggleSidebar}
+          title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+        >
+          <Icons.PanelLeft className={`sidebar-toggle-icon ${sidebarCollapsed ? 'collapsed' : ''}`} />
+        </button>
+
+        <div className="nav-buttons">
+          <button
+            className="nav-btn"
+            onClick={onGoBack}
+            disabled={!canGoBack}
+            title="Go back"
+          >
+            <Icons.ArrowLeft />
+          </button>
+          <button
+            className="nav-btn"
+            onClick={onGoForward}
+            disabled={!canGoForward}
+            title="Go forward"
+          >
+            <Icons.ArrowRight />
+          </button>
+          <button
+            className="nav-btn"
+            onClick={onGoHome}
+            title="Go home"
+          >
+            <Icons.Home />
+          </button>
+        </div>
       </div>
 
       <div className="topbar-center">
@@ -237,6 +372,8 @@ function TopBar({ onOpenCommandPalette, onToggleTheme, resolvedTheme, onNavigate
 
 interface SidebarProps {
   collapsed: boolean;
+  width: number;
+  onResizeStart: (e: React.MouseEvent) => void;
   fileTree: FileEntry[];
   notes: { id: string; title: string; updatedAt: Date | string; path: string }[];
   expandedFolders: FolderState;
@@ -252,6 +389,8 @@ interface SidebarProps {
 
 function Sidebar({
   collapsed,
+  width,
+  onResizeStart,
   fileTree,
   notes,
   expandedFolders,
@@ -282,7 +421,7 @@ function Sidebar({
   }
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={{ width }}>
       <div className="sidebar-header">
         <span className="sidebar-title">Explorer</span>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -319,6 +458,8 @@ function Sidebar({
         )}
       </div>
 
+      <SidebarCalendar collapsed={collapsed} />
+
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
           <Icons.Folder style={{ width: '12px', height: '12px', color: 'var(--color-text-tertiary)' }} />
@@ -327,6 +468,11 @@ function Sidebar({
           </span>
         </div>
       </div>
+
+      <div
+        className="sidebar-resize-handle"
+        onMouseDown={onResizeStart}
+      />
     </aside>
   );
 }
