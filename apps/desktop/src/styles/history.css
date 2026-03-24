@@ -1,0 +1,130 @@
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.history-header h3 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.history-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  color: var(--color-text-tertiary);
+}
+
+.history-empty-hint {
+  font-size: var(--text-sm);
+  margin-top: var(--space-2);
+}
+
+.history-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.history-list {
+  width: 200px;
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.history-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.history-item.selected {
+  background: var(--color-bg-secondary);
+  border-left: 2px solid var(--color-accent);
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-1);
+}
+
+.history-item-time {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.history-item-date {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.history-item-preview {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-preview-header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.history-preview-header h4 {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.history-preview-date {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.history-preview-content {
+  flex: 1;
+  padding: var(--space-3);
+  overflow-y: auto;
+}
+
+.history-preview-content pre {
+  margin: 0;
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}
+
+.history-preview-actions {
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}

@@ -1,8 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNotesStore } from '../store/notesStore';
+import { usePluginsStore } from '../store/pluginsStore';
+import { useVersioningStore } from '../versioning/store';
 import { NoteEditor, BacklinksPanel } from '@notes-app/ui';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { exportNote } from '../versioning/export';
 
 export function NotePage() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +18,10 @@ export function NotePage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [backlinksExpanded, setBacklinksExpanded] = useState(true);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const editorHooks = usePluginsStore((state) => state.editorHooks);
+  const setNoteContext = usePluginsStore((state) => state.setNoteContext);
+  const saveToHistory = useVersioningStore((state) => state.saveToHistory);
 
   const backlinks = id ? getBacklinks(id) : [];
 
@@ -22,15 +29,40 @@ export function NotePage() {
     if (note) {
       setTitle(note.title);
       setContent(note.content);
+      setNoteContext({ noteId: note.id, title: note.title, content: note.content });
     }
-  }, [note]);
+  }, [note, setNoteContext]);
+
+  useEffect(() => {
+    editorHooks.forEach((hook) => {
+      if (hook.onTitleChange) {
+        hook.onTitleChange(title);
+      }
+    });
+  }, [title, editorHooks]);
+
+  useEffect(() => {
+    editorHooks.forEach((hook) => {
+      if (hook.onContentChange) {
+        hook.onContentChange(content);
+      }
+    });
+  }, [content, editorHooks]);
 
   const handleSave = useCallback(() => {
     if (id) {
+      if (note) {
+        saveToHistory(note);
+      }
       updateNote(id, { title, content });
       setLastSaved(new Date());
+      editorHooks.forEach((hook) => {
+        if (hook.onSave) {
+          hook.onSave();
+        }
+      });
     }
-  }, [id, title, content, updateNote]);
+  }, [id, title, content, updateNote, editorHooks, note, saveToHistory]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -55,6 +87,20 @@ export function NotePage() {
       navigate('/');
     }
   }, [note, deleteNote, navigate]);
+
+  const handleExport = useCallback(async (format: 'markdown' | 'html' | 'json' | 'pdf') => {
+    if (note) {
+      await exportNote(note, format);
+    }
+  }, [note]);
+
+  const handleShowHistory = useCallback(() => {
+    const historyKey = `history-${note?.id}`;
+    window.__OPEN_PLUGIN_VIEW__?.({
+      key: historyKey,
+      component: 'HistoryPanel',
+    });
+  }, [note?.id]);
 
   const handleDropImage = useCallback(async (file: File): Promise<string | null> => {
     if (!vaultPath) return null;
@@ -99,6 +145,8 @@ export function NotePage() {
           onSave={handleSave}
           onDelete={handleDelete}
           onDropImage={handleDropImage}
+          onExport={handleExport}
+          onShowHistory={handleShowHistory}
           lastSaved={lastSaved}
         />
       </div>

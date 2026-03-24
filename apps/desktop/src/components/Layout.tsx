@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useNotesStore, FileEntry } from '../store/notesStore';
+import { usePluginsStore } from '../store/pluginsStore';
 import { useTheme } from '@notes-app/ui';
 import { CommandPalette, Icons } from '@notes-app/ui';
 import { SidebarCalendar } from './SidebarCalendar';
 import { TopBar } from './TopBar';
+import { initializePlugins } from '../plugins/manager';
 
 interface FolderState {
   [key: string]: boolean;
@@ -35,6 +37,13 @@ export function Layout() {
   historyIndexRef.current = historyIndex;
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
+
+  const pluginCommands = usePluginsStore((state) => state.commands);
+  const pluginTopBarButtons = usePluginsStore((state) => state.topBarButtons);
+
+  useEffect(() => {
+    initializePlugins();
+  }, []);
 
   useEffect(() => {
     const currentPath = location.pathname;
@@ -194,6 +203,13 @@ export function Layout() {
       category: 'Navigation',
       action: () => navigate('/settings'),
     },
+    ...pluginCommands.map((cmd) => ({
+      id: cmd.id,
+      title: cmd.name,
+      shortcut: cmd.shortcut,
+      category: 'Plugins',
+      action: cmd.action,
+    })),
   ];
 
   return (
@@ -210,6 +226,7 @@ export function Layout() {
         onGoForward={handleGoForward}
         canGoBack={historyIndex > 0}
         canGoForward={historyIndex < history.length - 1}
+        pluginButtons={pluginTopBarButtons}
       />
 
       <div className="main-layout">

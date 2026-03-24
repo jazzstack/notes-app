@@ -15,6 +15,8 @@ interface NoteEditorProps {
   onSave: () => void;
   onDelete?: () => void;
   onDropImage?: (file: File) => Promise<string | null>;
+  onExport?: (format: 'markdown' | 'html' | 'json' | 'pdf') => void;
+  onShowHistory?: () => void;
   lastSaved?: Date | null;
 }
 
@@ -26,6 +28,8 @@ export function NoteEditor({
   onSave,
   onDelete,
   onDropImage,
+  onExport,
+  onShowHistory,
   lastSaved,
 }: NoteEditorProps) {
   const [mode, setMode] = useState<EditorMode>('split');
@@ -122,6 +126,8 @@ export function NoteEditor({
           onModeChange={setMode}
           onSave={handleSave}
           onDelete={handleDelete}
+          onExport={onExport}
+          onShowHistory={onShowHistory}
           isSaving={isSaving}
           hasDelete={!!onDelete}
         />
@@ -224,11 +230,13 @@ interface EditorToolbarProps {
   onModeChange: (mode: EditorMode) => void;
   onSave: () => void;
   onDelete?: () => void;
+  onExport?: (format: 'markdown' | 'html' | 'json' | 'pdf') => void;
+  onShowHistory?: () => void;
   isSaving: boolean;
   hasDelete: boolean;
 }
 
-function EditorToolbar({ mode, onModeChange, onSave, onDelete, isSaving, hasDelete }: EditorToolbarProps) {
+function EditorToolbar({ mode, onModeChange, onSave, onDelete, onExport, onShowHistory, isSaving, hasDelete }: EditorToolbarProps) {
   return (
     <div className="editor-toolbar" style={{ justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -255,6 +263,26 @@ function EditorToolbar({ mode, onModeChange, onSave, onDelete, isSaving, hasDele
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+        {onShowHistory && (
+          <button
+            className="btn btn-ghost btn-icon btn-sm"
+            onClick={onShowHistory}
+            title="History"
+          >
+            <Icons.List style={{ width: 16, height: 16 }} />
+          </button>
+        )}
+        {onExport && (
+          <div className="dropdown">
+            <button
+              className="btn btn-ghost btn-icon btn-sm"
+              title="Export"
+              onClick={() => onExport('markdown')}
+            >
+              <Icons.Save style={{ width: 16, height: 16 }} />
+            </button>
+          </div>
+        )}
         <button
           className="btn btn-ghost btn-icon btn-sm"
           onClick={onSave}

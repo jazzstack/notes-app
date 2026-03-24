@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Icons } from '@notes-app/ui';
+import { PluginTopBarButton } from '@notes-app/shared';
 
 type MenuItem = {
   label: string;
@@ -21,6 +22,7 @@ interface TopBarProps {
   onGoForward: () => void;
   canGoBack: boolean;
   canGoForward: boolean;
+  pluginButtons?: PluginTopBarButton[];
 }
 
 export function TopBar({
@@ -35,6 +37,7 @@ export function TopBar({
   onGoForward,
   canGoBack,
   canGoForward,
+  pluginButtons = [],
 }: TopBarProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -180,6 +183,16 @@ export function TopBar({
       </div>
 
       <div className="topbar-section topbar-right">
+        {pluginButtons.filter(b => b.position !== 'left').map((button) => (
+          <button
+            key={button.id}
+            className="topbar-icon-btn"
+            onClick={button.action}
+            title={button.title}
+          >
+            <Icons.ZoomIn style={{ width: 16, height: 16 }} />
+          </button>
+        ))}
         <button
           className="topbar-icon-btn"
           onClick={onNavigateGraph}

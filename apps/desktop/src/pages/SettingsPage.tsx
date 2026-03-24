@@ -1,14 +1,42 @@
 import { useAppStore } from '../store/appStore';
 import { useNotesStore } from '../store/notesStore';
+import { usePluginsStore } from '../store/pluginsStore';
+import { useSyncStore } from '../store/syncStore';
 import { useTheme } from '@notes-app/ui';
 import { Icons } from '@notes-app/ui';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export function SettingsPage() {
   const { settings, updateSettings } = useAppStore();
   const { theme, setTheme } = useTheme();
   const { vaultPath, vaultInitialized, selectVault } = useNotesStore();
+  const plugins = usePluginsStore((state) => state.plugins);
+  const enabledPlugins = usePluginsStore((state) => state.enabledPlugins);
+  const enablePlugin = usePluginsStore((state) => state.enablePlugin);
+  const disablePlugin = usePluginsStore((state) => state.disablePlugin);
+  const { status, config, initialize, configure, sync, setConfig } = useSyncStore();
+  const [supabaseUrl, setSupabaseUrl] = useState('');
+  const [supabaseKey, setSupabaseKey] = useState('');
   const [customCSS, setCustomCSS] = useState('');
+
+  useEffect(() => {
+    initialize();
+  }, []);
+
+  useEffect(() => {
+    if (config.supabaseUrl) setSupabaseUrl(config.supabaseUrl);
+    if (config.supabaseAnonKey) setSupabaseKey(config.supabaseAnonKey);
+  }, [config]);
+
+  const handleConfigureSync = () => {
+    if (supabaseUrl && supabaseKey) {
+      configure(supabaseUrl, supabaseKey);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    await sync();
+  };
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
@@ -137,21 +165,145 @@ export function SettingsPage() {
       </section>
 
       <section className="settings-section">
+        <h2 className="settings-section-title">Plugins</h2>
+
+        <div className="settings-item">
+          <div className="settings-item-content">
+            <div className="settings-item-label">Plugin System</div>
+            <div className="settings-item-description">
+              Extend app functionality with plugins
+            </div>
+          </div>
+        </div>
+
+        {plugins.length === 0 ? (
+          <div className="settings-item">
+            <div className="settings-item-description" style={{ padding: 'var(--space-3)', color: 'var(--color-text-tertiary)' }}>
+              No plugins installed
+            </div>
+          </div>
+        ) : (
+          plugins.map((plugin) => (
+            <div key={plugin.id} className="settings-item">
+              <div className="settings-item-content">
+                <div className="settings-item-label">{plugin.name}</div>
+                <div className="settings-item-description">
+                  {plugin.description} (v{plugin.version})
+                </div>
+              </div>
+              <div className="settings-item-control">
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={enabledPlugins.has(plugin.id)}
+                    onChange={async (e) => {
+                      if (e.target.checked) {
+                        await enablePlugin(plugin.id);
+                      } else {
+                        await disablePlugin(plugin.id);
+                      }
+                    }}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+            </div>
+          ))
+        )}
+      </section>
+
+      <section className="settings-section">
         <h2 className="settings-section-title">Sync</h2>
 
         <div className="settings-item">
           <div className="settings-item-content">
-            <div className="settings-item-label">Enable Sync</div>
+            <div className="settings-item-label">Status</div>
             <div className="settings-item-description">
-              Sync your notes across devices
+              {status.state === 'syncing' && 'Syncing...'}
+              {status.state === 'idle' && `Last synced: ${status.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleString() : 'Never'}`}
+              {status.state === 'error' && `Error: ${status.error || 'Unknown error'}`}
+              {status.state === 'offline' && 'Offline'}
+              {status.pendingChanges > 0 && ` (${status.pendingChanges} pending changes)`}
+            </div>
+          </div>
+          <div className="settings-item-control">
+            <button 
+              className="btn btn-secondary" 
+              onClick={handleSyncNow}
+              disabled={status.state === 'syncing'}
+            >
+              <Icons.Save />
+              Sync Now
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-item" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+          <div className="settings-item-content" style={{ marginBottom: 'var(--space-3)' }}>
+            <div className="settings-item-label">Supabase Configuration</div>
+            <div className="settings-item-description">
+              Configure your Supabase project for cloud sync
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+            <input
+              type="text"
+              className="input"
+              placeholder="Supabase URL (e.g., https://xxxxx.supabase.co)"
+              value={supabaseUrl}
+              onChange={(e) => setSupabaseUrl(e.target.value)}
+            />
+            <input
+              type="password"
+              className="input"
+              placeholder="Supabase anon key"
+              value={supabaseKey}
+              onChange={(e) => setSupabaseKey(e.target.value)}
+            />
+          </div>
+          
+          <button 
+            className="btn btn-primary"
+            onClick={handleConfigureSync}
+            disabled={!supabaseUrl || !supabaseKey}
+          >
+            Configure Sync
+          </button>
+        </div>
+
+        <div className="settings-item">
+          <div className="settings-item-content">
+            <div className="settings-item-label">End-to-End Encryption</div>
+            <div className="settings-item-description">
+              Encrypt notes before syncing to cloud
             </div>
           </div>
           <div className="settings-item-control">
             <label className="toggle">
               <input
                 type="checkbox"
-                checked={settings.syncEnabled}
-                onChange={(e) => updateSettings({ syncEnabled: e.target.checked })}
+                checked={config.encryptionEnabled}
+                onChange={(e) => setConfig({ encryptionEnabled: e.target.checked })}
+              />
+              <span className="toggle-slider" />
+            </label>
+          </div>
+        </div>
+
+        <div className="settings-item">
+          <div className="settings-item-content">
+            <div className="settings-item-label">Auto Sync</div>
+            <div className="settings-item-description">
+              Automatically sync changes
+            </div>
+          </div>
+          <div className="settings-item-control">
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={config.autoSync}
+                onChange={(e) => setConfig({ autoSync: e.target.checked })}
               />
               <span className="toggle-slider" />
             </label>
@@ -220,6 +372,14 @@ export function SettingsPage() {
             <div className="shortcut-keys">
               <span className="shortcut-key">⌘</span>
               <span className="shortcut-key">;</span>
+            </div>
+          </div>
+          <div className="shortcut-item">
+            <span className="shortcut-action">Sync Notes</span>
+            <div className="shortcut-keys">
+              <span className="shortcut-key">⌘</span>
+              <span className="shortcut-key">Shift</span>
+              <span className="shortcut-key">S</span>
             </div>
           </div>
         </div>
