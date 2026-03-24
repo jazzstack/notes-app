@@ -15,6 +15,11 @@ interface TopBarProps {
   resolvedTheme: 'light' | 'dark';
   onNavigateSettings: () => void;
   onCreateNote: () => void;
+  onNavigateHome: () => void;
+  onGoBack: () => void;
+  onGoForward: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
 }
 
 export function TopBar({
@@ -23,6 +28,11 @@ export function TopBar({
   resolvedTheme,
   onNavigateSettings,
   onCreateNote,
+  onNavigateHome,
+  onGoBack,
+  onGoForward,
+  canGoBack,
+  canGoForward,
 }: TopBarProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -95,6 +105,27 @@ export function TopBar({
   return (
     <nav className="topbar" ref={menuRef}>
       <div className="topbar-section topbar-left">
+        <button
+          className="topbar-icon-btn"
+          onClick={onGoBack}
+          disabled={!canGoBack}
+          title="Go Back"
+        >
+          <Icons.ArrowLeft style={{ width: 16, height: 16 }} />
+        </button>
+        <button
+          className="topbar-icon-btn"
+          onClick={onGoForward}
+          disabled={!canGoForward}
+          title="Go Forward"
+        >
+          <Icons.ArrowRight style={{ width: 16, height: 16 }} />
+        </button>
+        <div className="topbar-divider" />
+        <button className="topbar-icon-btn" onClick={onNavigateHome} title="Go Home">
+          <Icons.Home style={{ width: 16, height: 16 }} />
+        </button>
+        <div className="topbar-divider" />
         <div className="topbar-logo" onClick={onNavigateSettings} title="Notes App">
           <Icons.FileText style={{ width: 16, height: 16 }} />
         </div>

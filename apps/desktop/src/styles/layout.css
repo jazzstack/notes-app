@@ -202,6 +202,23 @@
   color: var(--color-text);
 }
 
+.topbar-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.topbar-icon-btn:disabled:hover {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 16px;
+  background-color: var(--color-border);
+  margin: 0 var(--space-1);
+}
+
 /* Sidebar */
 .sidebar {
   flex-shrink: 0;

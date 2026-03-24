@@ -27,8 +27,43 @@ export function Layout() {
   const [expandedFolders, setExpandedFolders] = useState<FolderState>({});
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: FileEntry } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
+  const [history, setHistory] = useState<string[]>(['/']);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const historyRef = useRef(history);
+  const historyIndexRef = useRef(historyIndex);
+  historyRef.current = history;
+  historyIndexRef.current = historyIndex;
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
+
+  useEffect(() => {
+    const currentPath = location.pathname;
+    if (currentPath !== historyRef.current[historyIndexRef.current]) {
+      const newHistory = [...historyRef.current.slice(0, historyIndexRef.current + 1), currentPath];
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  }, [location.pathname]);
+
+  const handleNavigateHome = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
+  const handleGoBack = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      const newIndex = historyIndexRef.current - 1;
+      setHistoryIndex(newIndex);
+      navigate(historyRef.current[newIndex]);
+    }
+  }, [navigate]);
+
+  const handleGoForward = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      const newIndex = historyIndexRef.current + 1;
+      setHistoryIndex(newIndex);
+      navigate(historyRef.current[newIndex]);
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (vaultInitialized && vaultPath) {
@@ -169,6 +204,11 @@ export function Layout() {
         resolvedTheme={resolvedTheme}
         onNavigateSettings={() => navigate('/settings')}
         onCreateNote={handleCreateNote}
+        onNavigateHome={handleNavigateHome}
+        onGoBack={handleGoBack}
+        onGoForward={handleGoForward}
+        canGoBack={historyIndex > 0}
+        canGoForward={historyIndex < history.length - 1}
       />
 
       <div className="main-layout">
