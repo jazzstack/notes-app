@@ -1,27 +1,46 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotesStore } from '../store/notesStore';
 import { useAppStore } from '../store/appStore';
 import { Icons } from '@notes-app/ui';
+import { SearchFilter } from '../components/SearchFilter';
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { notes, createNote, vaultInitialized, selectVault, initializeVault } = useNotesStore();
+  const { 
+    notes, 
+    createNote, 
+    vaultInitialized, 
+    selectVault, 
+    initializeVault,
+    allTags,
+    filterNotes 
+  } = useNotesStore();
   const { settings } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredNotes, setFilteredNotes] = useState(notes);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<'title' | 'updatedAt' | 'createdAt'>('updatedAt');
 
   useEffect(() => {
     initializeVault();
   }, [initializeVault]);
 
-  useEffect(() => {
-    const filtered = notes.filter((note) =>
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredNotes = useMemo(() => {
+    return filterNotes({
+      query: searchQuery,
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
+      sortBy,
+      sortOrder: 'desc',
+    });
+  }, [notes, searchQuery, selectedTags, sortBy, filterNotes]);
+
+  const handleTagToggle = useCallback((tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag)
+        ? prev.filter((t) => t !== tag)
+        : [...prev, tag]
     );
-    setFilteredNotes(filtered);
-  }, [notes, searchQuery]);
+  }, []);
 
   const handleCreateNote = useCallback(async () => {
     const note = await createNote('Untitled');
@@ -61,27 +80,26 @@ export function HomePage() {
   return (
     <div className="home-container">
       <div className="home-content">
-        <div style={{ marginBottom: 'var(--space-8)' }}>
+        <div style={{ marginBottom: 'var(--space-6)' }}>
           <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-2)' }}>
             All Notes
           </h1>
           <p style={{ color: 'var(--color-text-secondary)' }}>
-            {notes.length} note{notes.length !== 1 ? 's' : ''} in your vault
+            {filteredNotes.length} of {notes.length} note{notes.length !== 1 ? 's' : ''} in your vault
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
-          <div className="search-bar" style={{ flex: 1, maxWidth: '400px' }}>
-            <Icons.Search className="search-bar-icon" />
-            <input
-              type="text"
-              className="search-bar-input"
-              placeholder="Search notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ paddingLeft: 'var(--space-8)' }}
-            />
-          </div>
+        <SearchFilter
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          selectedTags={selectedTags}
+          onTagToggle={handleTagToggle}
+          allTags={allTags}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+        />
+
+        <div style={{ marginBottom: 'var(--space-4)' }}>
           <button className="btn btn-primary" onClick={handleCreateNote}>
             <Icons.Plus />
             New Note
@@ -89,7 +107,11 @@ export function HomePage() {
         </div>
 
         {filteredNotes.length === 0 ? (
-          <EmptyState onCreateNote={handleCreateNote} hasNotes={notes.length > 0} />
+          <EmptyState 
+            onCreateNote={handleCreateNote} 
+            hasNotes={notes.length > 0}
+            hasFilters={searchQuery.length > 0 || selectedTags.length > 0}
+          />
         ) : (
           <div className="notes-grid">
             {filteredNotes.map((note) => (
@@ -207,21 +229,22 @@ function NoteCard({ note, onClick, onDelete }: NoteCardProps) {
 interface EmptyStateProps {
   onCreateNote: () => void;
   hasNotes: boolean;
+  hasFilters?: boolean;
 }
 
-function EmptyState({ onCreateNote, hasNotes }: EmptyStateProps) {
+function EmptyState({ onCreateNote, hasNotes, hasFilters }: EmptyStateProps) {
   return (
     <div className="home-empty-state">
       <Icons.FileText className="empty-state-icon" style={{ width: '64px', height: '64px' }} />
       <h2 className="empty-state-title">
-        {hasNotes ? 'No matching notes' : 'Welcome to Notes'}
+        {hasFilters ? 'No matching notes' : 'Welcome to Notes'}
       </h2>
       <p className="empty-state-description">
-        {hasNotes
-          ? 'Try adjusting your search terms'
+        {hasFilters
+          ? 'Try adjusting your search terms or filters'
           : 'Create your first note to start organizing your thoughts'}
       </p>
-      {!hasNotes && (
+      {!hasNotes && !hasFilters && (
         <button className="btn btn-primary btn-lg" onClick={onCreateNote}>
           <Icons.Plus />
           Create your first note

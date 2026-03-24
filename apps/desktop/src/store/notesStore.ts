@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Note, Backlink } from '@notes-app/shared';
 import { useAppStore } from './appStore';
-import { buildBacklinksMap } from '../utils/links';
+import { buildBacklinksMap, extractAllTags, searchNotes, SearchOptions } from '../utils/links';
 
 export interface FileEntry {
   name: string;
@@ -26,6 +26,7 @@ interface NotesState {
   error: string | null;
   fileTree: FileEntry[];
   backlinksMap: Map<string, Backlink[]>;
+  allTags: string[];
   initializeVault: () => Promise<void>;
   selectVault: () => Promise<void>;
   loadNotes: () => Promise<void>;
@@ -43,6 +44,8 @@ interface NotesState {
   getNotesCount: () => number;
   getBacklinks: (noteId: string) => Backlink[];
   rebuildBacklinks: () => void;
+  getAllTags: () => string[];
+  filterNotes: (options: SearchOptions) => Note[];
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
@@ -54,6 +57,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   error: null,
   fileTree: [],
   backlinksMap: new Map(),
+  allTags: [],
 
   initializeVault: async () => {
     set({ isLoading: true, error: null });
@@ -105,7 +109,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     try {
       const notes = await invoke<Note[]>('load_all_notes', { vaultPath });
       const backlinksMap = buildBacklinksMap(notes);
-      set({ notes, isLoading: false, backlinksMap });
+      const allTags = extractAllTags(notes);
+      set({ notes, isLoading: false, backlinksMap, allTags });
     } catch (error) {
       console.error('Failed to load notes:', error);
       set({ error: String(error), isLoading: false });
@@ -292,6 +297,16 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   rebuildBacklinks: () => {
     const { notes } = get();
     const newBacklinksMap = buildBacklinksMap(notes);
-    set({ backlinksMap: newBacklinksMap });
+    const newAllTags = extractAllTags(notes);
+    set({ backlinksMap: newBacklinksMap, allTags: newAllTags });
+  },
+
+  getAllTags: () => {
+    return get().allTags;
+  },
+
+  filterNotes: (options: SearchOptions) => {
+    const { notes } = get();
+    return searchNotes(notes, options);
   },
 }));

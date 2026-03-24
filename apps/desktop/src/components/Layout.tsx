@@ -203,6 +203,7 @@ export function Layout() {
         onToggleTheme={toggleTheme}
         resolvedTheme={resolvedTheme}
         onNavigateSettings={() => navigate('/settings')}
+        onNavigateGraph={() => navigate('/graph')}
         onCreateNote={handleCreateNote}
         onNavigateHome={handleNavigateHome}
         onGoBack={handleGoBack}

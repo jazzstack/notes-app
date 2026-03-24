@@ -14,6 +14,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   resolvedTheme: 'light' | 'dark';
   onNavigateSettings: () => void;
+  onNavigateGraph: () => void;
   onCreateNote: () => void;
   onNavigateHome: () => void;
   onGoBack: () => void;
@@ -27,6 +28,7 @@ export function TopBar({
   onToggleTheme,
   resolvedTheme,
   onNavigateSettings,
+  onNavigateGraph,
   onCreateNote,
   onNavigateHome,
   onGoBack,
@@ -178,6 +180,13 @@ export function TopBar({
       </div>
 
       <div className="topbar-section topbar-right">
+        <button
+          className="topbar-icon-btn"
+          onClick={onNavigateGraph}
+          title="Graph View"
+        >
+          <Icons.Graph style={{ width: 16, height: 16 }} />
+        </button>
         <button
           className="topbar-icon-btn"
           onClick={onToggleTheme}
