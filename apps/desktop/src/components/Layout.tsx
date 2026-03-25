@@ -24,6 +24,10 @@ export function Layout() {
   const loadDirectory = useNotesStore((state) => state.loadDirectory);
   const vaultPath = useNotesStore((state) => state.vaultPath);
   const selectVault = useNotesStore((state) => state.selectVault);
+  const vaults = useNotesStore((state) => state.vaults);
+  const createVault = useNotesStore((state) => state.createVault);
+  const deleteVault = useNotesStore((state) => state.deleteVault);
+  const switchVault = useNotesStore((state) => state.switchVault);
   const { resolvedTheme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(260);
@@ -242,6 +246,11 @@ export function Layout() {
           onSelectNote={(id) => navigate(`/note/${id}`)}
           onSelectVault={selectVault}
           vaultInitialized={vaultInitialized}
+          vaults={vaults}
+          currentVaultPath={vaultPath}
+          onCreateVault={createVault}
+          onDeleteVault={deleteVault}
+          onSwitchVault={switchVault}
         />
 
         <main className="main-content">
@@ -306,6 +315,11 @@ interface SidebarProps {
   onSelectNote: (id: string) => void;
   onSelectVault: () => void;
   vaultInitialized: boolean;
+  vaults: { path: string; name: string }[];
+  currentVaultPath: string;
+  onCreateVault: (name: string) => void;
+  onDeleteVault: (path: string) => void;
+  onSwitchVault: (path: string) => void;
 }
 
 function Sidebar({
@@ -322,13 +336,138 @@ function Sidebar({
   currentNoteId,
   onSelectNote,
   onSelectVault,
-  vaultInitialized
+  vaultInitialized,
+  vaults,
+  currentVaultPath,
+  onCreateVault,
+  onDeleteVault,
+  onSwitchVault,
 }: SidebarProps) {
+  const [vaultDropdownOpen, setVaultDropdownOpen] = useState(false);
+  const [showCreateVault, setShowCreateVault] = useState(false);
+  const [newVaultName, setNewVaultName] = useState('');
+  const [isCreatingVault, setIsCreatingVault] = useState(false);
   const noteByPath = new Map(notes.map((n) => [n.path, n]));
+  const vaultDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (vaultDropdownRef.current && !vaultDropdownRef.current.contains(e.target as Node)) {
+        setVaultDropdownOpen(false);
+        setShowCreateVault(false);
+      }
+    };
+
+    if (vaultDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [vaultDropdownOpen]);
+
+  const handleCreateVaultSubmit = async () => {
+    if (newVaultName.trim() && !isCreatingVault) {
+      setIsCreatingVault(true);
+      try {
+        await onCreateVault(newVaultName.trim());
+        setNewVaultName('');
+        setShowCreateVault(false);
+      } catch (error) {
+        console.error('Failed to create vault:', error);
+        alert('Failed to create vault: ' + (error as Error).message);
+      } finally {
+        setIsCreatingVault(false);
+      }
+    }
+  };
 
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} style={{ width }}>
       <div className="sidebar-inner">
+        <div className="vault-selector">
+          <button 
+            className="vault-selector-btn"
+            onClick={() => setVaultDropdownOpen(!vaultDropdownOpen)}
+          >
+            <Icons.Folder style={{ width: '14px', height: '14px' }} />
+            <span className="vault-selector-name">
+              {vaults.find(v => v.path === currentVaultPath)?.name || 'Select Vault'}
+            </span>
+            <Icons.ChevronRight style={{ width: '12px', height: '12px', transform: vaultDropdownOpen ? 'rotate(90deg)' : undefined }} />
+          </button>
+          
+          {vaultDropdownOpen && (
+            <div className="vault-dropdown" ref={vaultDropdownRef}>
+              {vaults.map((vault) => (
+                <div 
+                  key={vault.path} 
+                  className={`vault-dropdown-item ${vault.path === currentVaultPath ? 'active' : ''}`}
+                  onClick={() => {
+                    onSwitchVault(vault.path);
+                    setVaultDropdownOpen(false);
+                  }}
+                >
+                  <Icons.Folder style={{ width: '14px', height: '14px' }} />
+                  <span className="vault-dropdown-name">{vault.name}</span>
+                  <button 
+                    className="vault-dropdown-delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete vault "${vault.name}"? This will delete all notes in this vault.`)) {
+                        onDeleteVault(vault.path);
+                      }
+                    }}
+                  >
+                    <Icons.Trash style={{ width: '12px', height: '12px' }} />
+                  </button>
+                </div>
+              ))}
+              
+              <div className="vault-dropdown-divider" />
+              
+              {!showCreateVault ? (
+                <div 
+                  className="vault-dropdown-item" 
+                  onClick={() => setShowCreateVault(true)}
+                >
+                  <Icons.Plus style={{ width: '14px', height: '14px' }} />
+                  <span>Create New Vault</span>
+                </div>
+              ) : (
+                <div className="vault-dropdown-create">
+                  <input
+                    type="text"
+                    placeholder="Vault name"
+                    value={newVaultName}
+                    onChange={(e) => setNewVaultName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreateVaultSubmit();
+                      if (e.key === 'Escape') {
+                        setShowCreateVault(false);
+                        setNewVaultName('');
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <button onClick={handleCreateVaultSubmit} disabled={isCreatingVault}>
+                    {isCreatingVault ? '...' : 'Create'}
+                  </button>
+                </div>
+              )}
+              
+              <div 
+                className="vault-dropdown-item" 
+                onClick={() => {
+                  onSelectVault();
+                  setVaultDropdownOpen(false);
+                }}
+              >
+                <Icons.FolderOpen style={{ width: '14px', height: '14px' }} />
+                <span>Open Existing Vault</span>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="sidebar-header">
           <span className="sidebar-title">Explorer</span>
           <div style={{ display: 'flex', gap: '4px' }}>

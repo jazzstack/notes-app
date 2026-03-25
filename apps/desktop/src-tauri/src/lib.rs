@@ -19,10 +19,17 @@ pub struct Note {
     pub metadata: serde_json::Value,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Vault {
+    pub path: String,
+    pub name: String,
+    pub last_opened: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VaultConfig {
-    pub path: String,
-    pub last_opened: Option<String>,
+    pub vaults: Vec<Vault>,
+    pub current_vault_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,8 +63,8 @@ fn ensure_vault_config(app_handle: &tauri::AppHandle) -> Result<VaultConfig, Str
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse vault config: {}", e))
     } else {
         Ok(VaultConfig {
-            path: String::new(),
-            last_opened: None,
+            vaults: Vec::new(),
+            current_vault_path: None,
         })
     }
 }
@@ -91,6 +98,14 @@ fn slugify(title: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join("-")
+}
+
+fn get_vault_name_from_path(path: &str) -> String {
+    Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("Vault")
+        .to_string()
 }
 
 fn extract_frontmatter(content: &str) -> (Option<String>, String, serde_json::Value) {
@@ -190,9 +205,9 @@ fn get_app_version() -> String {
 #[tauri::command]
 fn get_vault_state(app_handle: tauri::AppHandle) -> Result<VaultState, String> {
     let config = ensure_vault_config(&app_handle)?;
-    let is_initialized = !config.path.is_empty();
+    let is_initialized = config.current_vault_path.is_some();
     Ok(VaultState {
-        path: config.path,
+        path: config.current_vault_path.unwrap_or_default(),
         initialized: is_initialized,
     })
 }
@@ -211,8 +226,21 @@ fn set_vault_path(app_handle: tauri::AppHandle, path: String) -> Result<(), Stri
     }
 
     let mut config = ensure_vault_config(&app_handle)?;
-    config.path = path.clone();
-    config.last_opened = Some(chrono::Utc::now().to_rfc3339());
+
+    let vault_name = get_vault_name_from_path(&path);
+    let now = chrono::Utc::now().to_rfc3339();
+
+    if let Some(existing_vault) = config.vaults.iter_mut().find(|v| v.path == path) {
+        existing_vault.last_opened = Some(now);
+    } else {
+        config.vaults.push(Vault {
+            path: path.clone(),
+            name: vault_name,
+            last_opened: Some(now),
+        });
+    }
+
+    config.current_vault_path = Some(path.clone());
 
     save_vault_config(&app_handle, &config)?;
 
@@ -223,7 +251,111 @@ fn set_vault_path(app_handle: tauri::AppHandle, path: String) -> Result<(), Stri
 #[tauri::command]
 fn get_vault_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     let config = ensure_vault_config(&app_handle)?;
-    Ok(config.path)
+    Ok(config.current_vault_path.unwrap_or_default())
+}
+
+#[tauri::command]
+fn list_vaults(app_handle: tauri::AppHandle) -> Result<Vec<Vault>, String> {
+    let config = ensure_vault_config(&app_handle)?;
+    Ok(config.vaults)
+}
+
+#[tauri::command]
+fn create_vault(app_handle: tauri::AppHandle, name: String) -> Result<Vault, String> {
+    let vaults_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("vaults");
+
+    if !vaults_dir.exists() {
+        fs::create_dir_all(&vaults_dir)
+            .map_err(|e| format!("Failed to create vaults directory: {}", e))?;
+    }
+
+    let vault_path = vaults_dir.join(&name);
+
+    if vault_path.exists() {
+        return Err("Vault with this name already exists".to_string());
+    }
+
+    fs::create_dir_all(&vault_path).map_err(|e| format!("Failed to create vault: {}", e))?;
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let vault = Vault {
+        path: vault_path.to_string_lossy().to_string(),
+        name: name.clone(),
+        last_opened: Some(now.clone()),
+    };
+
+    let mut config = ensure_vault_config(&app_handle)?;
+    config.vaults.push(vault.clone());
+    config.current_vault_path = Some(vault.path.clone());
+    save_vault_config(&app_handle, &config)?;
+
+    log::info!("Created vault: {}", name);
+    Ok(vault)
+}
+
+#[tauri::command]
+fn delete_vault(app_handle: tauri::AppHandle, path: String) -> Result<(), String> {
+    let vault_path = Path::new(&path);
+
+    if !vault_path.exists() {
+        return Err("Vault does not exist".to_string());
+    }
+
+    if !vault_path.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+
+    fs::remove_dir_all(vault_path).map_err(|e| format!("Failed to delete vault: {}", e))?;
+
+    let mut config = ensure_vault_config(&app_handle)?;
+    config.vaults.retain(|v| v.path != path);
+
+    if config.current_vault_path.as_ref() == Some(&path) {
+        config.current_vault_path = config.vaults.first().map(|v| v.path.clone());
+    }
+
+    save_vault_config(&app_handle, &config)?;
+
+    log::info!("Deleted vault: {}", path);
+    Ok(())
+}
+
+#[tauri::command]
+fn remove_vault(app_handle: tauri::AppHandle, path: String) -> Result<(), String> {
+    let mut config = ensure_vault_config(&app_handle)?;
+    config.vaults.retain(|v| v.path != path);
+
+    if config.current_vault_path.as_ref() == Some(&path) {
+        config.current_vault_path = config.vaults.first().map(|v| v.path.clone());
+    }
+
+    save_vault_config(&app_handle, &config)?;
+
+    log::info!("Removed vault from list: {}", path);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_current_vault(app_handle: tauri::AppHandle, path: String) -> Result<(), String> {
+    let mut config = ensure_vault_config(&app_handle)?;
+
+    if !config.vaults.iter().any(|v| v.path == path) {
+        return Err("Vault not found in list".to_string());
+    }
+
+    if let Some(vault) = config.vaults.iter_mut().find(|v| v.path == path) {
+        vault.last_opened = Some(chrono::Utc::now().to_rfc3339());
+    }
+
+    config.current_vault_path = Some(path.clone());
+    save_vault_config(&app_handle, &config)?;
+
+    log::info!("Set current vault to: {}", path);
+    Ok(())
 }
 
 #[tauri::command]
@@ -669,6 +801,11 @@ pub fn run() {
             get_vault_state,
             set_vault_path,
             get_vault_path,
+            list_vaults,
+            create_vault,
+            delete_vault,
+            remove_vault,
+            set_current_vault,
             list_directory,
             create_note,
             read_note,

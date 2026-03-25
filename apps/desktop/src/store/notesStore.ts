@@ -12,6 +12,12 @@ export interface FileEntry {
   is_note: boolean;
 }
 
+export interface Vault {
+  path: string;
+  name: string;
+  lastOpened: string | null;
+}
+
 interface VaultState {
   path: string;
   initialized: boolean;
@@ -27,6 +33,7 @@ interface NotesState {
   fileTree: FileEntry[];
   backlinksMap: Map<string, Backlink[]>;
   allTags: string[];
+  vaults: Vault[];
   initializeVault: () => Promise<void>;
   selectVault: () => Promise<void>;
   loadNotes: () => Promise<void>;
@@ -46,6 +53,11 @@ interface NotesState {
   rebuildBacklinks: () => void;
   getAllTags: () => string[];
   filterNotes: (options: SearchOptions) => Note[];
+  loadVaults: () => Promise<Vault[]>;
+  createVault: (name: string) => Promise<Vault | null>;
+  deleteVault: (path: string) => Promise<void>;
+  removeVault: (path: string) => Promise<void>;
+  switchVault: (path: string) => Promise<void>;
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
@@ -58,11 +70,13 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   fileTree: [],
   backlinksMap: new Map(),
   allTags: [],
+  vaults: [],
 
   initializeVault: async () => {
     set({ isLoading: true, error: null });
     try {
       const state = await invoke<VaultState>('get_vault_state');
+      await get().loadVaults();
       set({ 
         vaultPath: state.path, 
         vaultInitialized: state.initialized 
@@ -308,5 +322,96 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   filterNotes: (options: SearchOptions) => {
     const { notes } = get();
     return searchNotes(notes, options);
+  },
+
+  loadVaults: async () => {
+    try {
+      const vaults = await invoke<{ path: string; name: string; last_opened: string | null }[]>('list_vaults');
+      const mappedVaults: Vault[] = vaults.map(v => ({
+        path: v.path,
+        name: v.name,
+        lastOpened: v.last_opened,
+      }));
+      set({ vaults: mappedVaults });
+      return mappedVaults;
+    } catch (error) {
+      console.error('Failed to load vaults:', error);
+      return [];
+    }
+  },
+
+  createVault: async (name: string) => {
+    try {
+      const vault = await invoke<{ path: string; name: string; last_opened: string | null }>('create_vault', { name });
+      const mappedVault: Vault = {
+        path: vault.path,
+        name: vault.name,
+        lastOpened: vault.last_opened,
+      };
+      set((state) => ({
+        vaults: [...state.vaults, mappedVault],
+        vaultPath: vault.path,
+        vaultInitialized: true,
+      }));
+      await get().loadNotes();
+      await get().loadDirectory(vault.path);
+      return mappedVault;
+    } catch (error) {
+      console.error('Failed to create vault:', error);
+      set({ error: String(error) });
+      return null;
+    }
+  },
+
+  deleteVault: async (path: string) => {
+    try {
+      await invoke('delete_vault', { path });
+      const { vaults, vaultPath } = get();
+      const newVaults = vaults.filter(v => v.path !== path);
+      set({ vaults: newVaults });
+      
+      if (vaultPath === path) {
+        if (newVaults.length > 0) {
+          await get().switchVault(newVaults[0].path);
+        } else {
+          set({ vaultPath: '', vaultInitialized: false, notes: [], fileTree: [] });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete vault:', error);
+      set({ error: String(error) });
+    }
+  },
+
+  removeVault: async (path: string) => {
+    try {
+      await invoke('remove_vault', { path });
+      const { vaults, vaultPath } = get();
+      const newVaults = vaults.filter(v => v.path !== path);
+      set({ vaults: newVaults });
+      
+      if (vaultPath === path) {
+        if (newVaults.length > 0) {
+          await get().switchVault(newVaults[0].path);
+        } else {
+          set({ vaultPath: '', vaultInitialized: false, notes: [], fileTree: [] });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to remove vault:', error);
+      set({ error: String(error) });
+    }
+  },
+
+  switchVault: async (path: string) => {
+    try {
+      await invoke('set_current_vault', { path });
+      set({ vaultPath: path, vaultInitialized: true });
+      await get().loadNotes();
+      await get().loadDirectory(path);
+    } catch (error) {
+      console.error('Failed to switch vault:', error);
+      set({ error: String(error) });
+    }
   },
 }));
